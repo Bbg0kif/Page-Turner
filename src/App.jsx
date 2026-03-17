@@ -1,17 +1,37 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 
-const Home = () => <div style={{ padding: '20px' }}><h1>Головна: Каталог Page-Turner</h1></div>;
-const Fandoms = () => <div style={{ padding: '20px' }}><h1>Фандоми та чати</h1></div>;
-const Login = () => <div style={{ padding: '20px' }}><h1>Вхід у систему</h1></div>;
+const Home = () => (
+  <div className="container">
+    <h1>Головна: Каталог книг</h1>
+    <p>Тут незабаром з'являться твої книги з Firebase.</p>
+  </div>
+);
+
+const Fandoms = () => (
+  <div className="container">
+    <h1>Фандоми та чати</h1>
+    <p>Розділ для обговорення улюблених творів.</p>
+  </div>
+);
+
+const Login = () => (
+  <div className="container">
+    <h1>Вхід у систему</h1>
+    <p>Сторінка авторизації користувача.</p>
+  </div>
+);
 
 function App() {
   return (
     <Router>
-      <nav style={{ padding: '20px', borderBottom: '1px solid #ccc', display: 'flex', gap: '15px' }}>
-        <Link to="/">Каталог</Link>
-        <Link to="/fandoms">Фандоми</Link>
-        <Link to="/login">Увійти</Link>
+      <nav className="navbar">
+        <Link to="/" className="logo">Page-Turner</Link>
+        <div className="nav-links">
+          <Link to="/" className="nav-link">Каталог</Link>
+          <Link to="/fandoms" className="nav-link">Фандоми</Link>
+          <Link to="/login" className="nav-link">Увійти</Link>
+        </div>
       </nav>
 
       <Routes>
