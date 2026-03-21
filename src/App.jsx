@@ -1,26 +1,59 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { db } from './firebase';
+import { collection, getDocs } from 'firebase/firestore'; 
+import './App.css';
 
-const Home = () => (
-  <div className="container">
-    <h1>Головна: Каталог книг</h1>
-    <p>Тут незабаром з'являться твої книги з Firebase.</p>
-  </div>
-);
+const Home = () => {
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-const Fandoms = () => (
-  <div className="container">
-    <h1>Фандоми та чати</h1>
-    <p>Розділ для обговорення улюблених творів.</p>
-  </div>
-);
+  useEffect(() => {
+    const fetchBooks = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "books"));
+        const booksData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.id, ...doc.data()
+        }));
+        setBooks(booksData);
+        setLoading(false);
+      } catch (error) {
+        console.error("Помилка при завантаженні книг: ", error);
+        setLoading(false);
+      }
+    };
 
-const Login = () => (
-  <div className="container">
-    <h1>Вхід у систему</h1>
-    <p>Сторінка авторизації користувача.</p>
-  </div>
-);
+    fetchBooks();
+  }, []);
+
+  return (
+    <div className="container">
+      <h1>Каталог книг</h1>
+      {loading ? (
+        <p>Завантаження...</p>
+      ) : (
+        <div className="books-grid">
+          {books.map(book => (
+            <div key={book.id} className="book-card">
+              <h2>{book.title}</h2>
+              <h3>Автор: {book.author}</h3>
+              <p>{book.description}</p>
+              {book.excerpts && (
+                <div className="excerpts">
+                  <p><i>"{book.excerpts[0]}"</i></p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Fandoms = () => <div className="container"><h1>Фандоми та чати</h1></div>;
+const Login = () => <div className="container"><h1>Вхід у систему</h1></div>;
 
 function App() {
   return (
