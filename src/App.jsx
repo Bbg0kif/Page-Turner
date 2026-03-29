@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore'; 
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import AddBook from './pages/AddBook';
 import EditBook from './pages/EditBook';
+import Auth from './pages/Auth';
 import './App.css';
 
-const Home = () => {
+const Home = ({ user }) => {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,10 +53,12 @@ const Home = () => {
               <div key={book.id} className={`book-card ${isOfficial ? 'has-excerpts' : ''}`}>
                 {isOfficial && <span className="admin-badge">Офіційно</span>}
                 
-                <div className="card-actions">
-                  <Link title="Редагувати" to={`/edit/${book.id}`} className="action-btn edit">✏️</Link>
-                  <button title="Видалити" onClick={() => handleDelete(book.id)} className="action-btn delete">🗑️</button>
-                </div>
+                {user && (
+                  <div className="card-actions">
+                    <Link title="Редагувати" to={`/edit/${book.id}`} className="action-btn edit">✏️</Link>
+                    <button title="Видалити" onClick={() => handleDelete(book.id)} className="action-btn delete">🗑️</button>
+                  </div>
+                )}
 
                 <h2>{book.title}</h2>
                 <h3>Автор: {book.author}</h3>
@@ -75,30 +79,50 @@ const Home = () => {
 };
 
 function App() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    alert("Ви вийшли з аккаунту");
+  };
+
   return (
     <Router>
       <nav className="navbar">
         <Link to="/" className="logo">Page-Turner</Link>
         <div className="nav-links">
           <Link to="/" className="nav-link">Каталог</Link>
-          <Link to="/add" className="nav-link" style={{ color: '#3498db', fontWeight: 'bold' }}>+ Додати</Link>
+          
+          {user && <Link to="/add" className="nav-link" style={{ color: '#3498db', fontWeight: 'bold' }}>+ Додати</Link>}
+          
           <Link to="/fandoms" className="nav-link">Фандоми</Link>
-          <Link to="/login" className="nav-link">Увійти</Link>
+          
+          {user ? (
+            <button onClick={handleLogout} className="nav-link" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
+              Вийти ({user.email.split('@')[0]})
+            </button>
+          ) : (
+            <Link to="/login" className="nav-link">Увійти</Link>
+          )}
         </div>
       </nav>
 
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Home user={user} />} />
         <Route path="/add" element={<AddBook />} />
         <Route path="/edit/:id" element={<EditBook />} />
-        <Route path="/fandoms" element={<Fandoms />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Auth />} />
+        <Route path="/fandoms" element={<div className="container"><h1>Фандоми</h1></div>} />
       </Routes>
     </Router>
   );
 }
-
-const Fandoms = () => <div className="container"><h1>Фандоми</h1></div>;
-const Login = () => <div className="container"><h1>Вхід</h1></div>;
 
 export default App;

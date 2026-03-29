@@ -182,3 +182,9 @@ body {
 
 .action-btn.delete:hover { background: #fee2e2; }
 .action-btn.edit:hover { background: #e0f2fe; }
+
+.auth-box {
+  max-width: 400px;
+  margin: 50px auto;
+  text-align: center;
+}

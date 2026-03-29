@@ -3,7 +3,7 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBid-fB_ZhF_kJcNvdkotkn52M28lDcixc",
+  apiKey: "AIzaSyBid-fB_ZhF_kJcNvdkotkn52M28lDCixc",
   authDomain: "page-turner-b4d10.firebaseapp.com",
   projectId: "page-turner-b4d10",
   storageBucket: "page-turner-b4d10.firebasestorage.app",
