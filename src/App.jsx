@@ -6,6 +6,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import AddBook from './pages/AddBook';
 import EditBook from './pages/EditBook';
 import Auth from './pages/Auth';
+import Profile from './pages/Profile';
 import './App.css';
 
 const Home = ({ user }) => {
@@ -49,11 +50,17 @@ const Home = ({ user }) => {
         <div className="books-grid">
           {books.map(book => {
             const isOfficial = book.excerpts && book.excerpts.length > 0;
+            
+            const canEdit = user && (
+              book.userId === user.uid || 
+              (!book.userId && user.email === "b.oleksandra200@gmail.com") 
+            );
+
             return (
               <div key={book.id} className={`book-card ${isOfficial ? 'has-excerpts' : ''}`}>
                 {isOfficial && <span className="admin-badge">Офіційно</span>}
                 
-                {user && (
+                {canEdit && (
                   <div className="card-actions">
                     <Link title="Редагувати" to={`/edit/${book.id}`} className="action-btn edit">✏️</Link>
                     <button title="Видалити" onClick={() => handleDelete(book.id)} className="action-btn delete">🗑️</button>
@@ -99,15 +106,16 @@ function App() {
         <Link to="/" className="logo">Page-Turner</Link>
         <div className="nav-links">
           <Link to="/" className="nav-link">Каталог</Link>
-          
-          {user && <Link to="/add" className="nav-link" style={{ color: '#3498db', fontWeight: 'bold' }}>+ Додати</Link>}
-          
           <Link to="/fandoms" className="nav-link">Фандоми</Link>
           
           {user ? (
-            <button onClick={handleLogout} className="nav-link" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
-              Вийти ({user.email.split('@')[0]})
-            </button>
+            <>
+              <Link to="/add" className="nav-link" style={{ color: '#3498db' }}>+ Додати</Link>
+              <Link to="/profile" className="nav-link">Мій кабінет</Link>
+              <button onClick={handleLogout} className="nav-link logout-btn">
+                Вийти ({user.email.split('@')[0]})
+              </button>
+            </>
           ) : (
             <Link to="/login" className="nav-link">Увійти</Link>
           )}
@@ -119,6 +127,7 @@ function App() {
         <Route path="/add" element={<AddBook />} />
         <Route path="/edit/:id" element={<EditBook />} />
         <Route path="/login" element={<Auth />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/fandoms" element={<div className="container"><h1>Фандоми</h1></div>} />
       </Routes>
     </Router>

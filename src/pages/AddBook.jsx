@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,15 +11,22 @@ const AddBook = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!auth.currentUser) {
+      alert("Ви повинні увійти, щоб додати книгу");
+      return;
+    }
+
     try {
       await addDoc(collection(db, "books"), {
         title: title,
         author: author,
         description: description,
-        excerpts: []
+        excerpts: [],
+        userId: auth.currentUser.uid
       });
       alert("Книгу додано!");
-      navigate('/');
+      navigate('/'); 
     } catch (error) {
       console.error("Помилка додавання: ", error);
     }
@@ -27,24 +34,24 @@ const AddBook = () => {
 
   return (
     <div className="container">
-      <h1>Додати нову книгу</h1>
+      <h1>+Додати нову книгу</h1>
       <form onSubmit={handleSubmit} className="add-form">
+        <label>Назва книги</label>
         <input 
           type="text" 
-          placeholder="Назва книги" 
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required 
         />
+        <label>Автор</label>
         <input 
           type="text" 
-          placeholder="Автор" 
           value={author}
           onChange={(e) => setAuthor(e.target.value)}
           required 
         />
+        <label>Опис</label>
         <textarea 
-          placeholder="Короткий опис" 
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           required 
