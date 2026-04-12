@@ -216,3 +216,44 @@ body {
 .btn-submit:hover {
   background-color: #2980b9;
 }
+
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+
+.filter-btn {
+  padding: 8px 16px;
+  border: 1px solid #3498db;
+  background: white;
+  color: #3498db;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.filter-btn.active, .filter-btn:hover {
+  background: #3498db;
+  color: white;
+}
+
+.fandom-tag {
+  font-size: 0.7rem;
+  background: #f0f0f0;
+  padding: 4px 10px;
+  border-radius: 12px;
+  color: #666;
+  text-transform: uppercase;
+  font-weight: bold;
+  display: inline-block;
+  margin-bottom: 10px;
+}
+
+.fandom-select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  margin-bottom: 15px;
+}
