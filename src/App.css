@@ -257,3 +257,36 @@ body {
   border: 1px solid #ddd;
   margin-bottom: 15px;
 }
+
+.search-bar {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  flex: 2;
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 1rem;
+}
+
+.genre-select {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.genre-tag {
+  font-size: 0.7rem;
+  background: #e3f2fd;
+  padding: 4px 10px;
+  border-radius: 12px;
+  color: #1976d2;
+  text-transform: uppercase;
+  font-weight: bold;
+  display: inline-block;
+  margin-bottom: 10px;
+}

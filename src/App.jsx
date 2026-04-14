@@ -10,19 +10,20 @@ import Profile from './pages/Profile';
 import './App.css';
 
 const FANDOMS_LIST = ["Всі", "Original", "Harry Potter", "Marvel", "DC", "The Witcher", "Anime", "Інше"];
+const GENRES_LIST = ["Всі жанри", "Роман", "Фентезі", "Детектив", "Трилер", "Пригоди", "Драма", "Жахи", "Інше"];
 
 const Home = ({ user }) => {
   const [books, setBooks] = useState([]);
-  const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFandom, setActiveFandom] = useState("Всі");
+  const [selectedGenre, setSelectedGenre] = useState("Всі жанри");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const fetchBooks = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "books"));
       const booksData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setBooks(booksData);
-      setFilteredBooks(booksData);
       setLoading(false);
     } catch (error) {
       console.error(error);
@@ -32,14 +33,12 @@ const Home = ({ user }) => {
 
   useEffect(() => { fetchBooks(); }, []);
 
-  const filterByFandom = (fandomName) => {
-    setActiveFandom(fandomName);
-    if (fandomName === "Всі") {
-      setFilteredBooks(books);
-    } else {
-      setFilteredBooks(books.filter(b => b.fandom === fandomName));
-    }
-  };
+  const filteredBooks = books.filter(book => {
+    const matchesSearch = book.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFandom = activeFandom === "Всі" || book.fandom === activeFandom;
+    const matchesGenre = selectedGenre === "Всі жанри" || book.genre === selectedGenre;
+    return matchesSearch && matchesFandom && matchesGenre;
+  });
 
   const toggleFavorite = async (bookId) => {
     if (!user) { alert("Увійдіть у систему!"); return; }
@@ -57,10 +56,9 @@ const Home = ({ user }) => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Видалити?")) {
+    if (window.confirm("Видалити цю книгу?")) {
       await deleteDoc(doc(db, "books", id));
       setBooks(books.filter(b => b.id !== id));
-      setFilteredBooks(filteredBooks.filter(b => b.id !== id));
     }
   };
 
@@ -68,12 +66,29 @@ const Home = ({ user }) => {
     <div className="container">
       <h1>Каталог книг</h1>
 
+      <div className="search-bar">
+        <input 
+          type="text" 
+          placeholder="Пошук за назвою..." 
+          className="search-input"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <select 
+          className="genre-select" 
+          value={selectedGenre} 
+          onChange={(e) => setSelectedGenre(e.target.value)}
+        >
+          {GENRES_LIST.map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
+      </div>
+
       <div className="filter-bar">
         {FANDOMS_LIST.map(f => (
           <button 
             key={f} 
             className={`filter-btn ${activeFandom === f ? 'active' : ''}`}
-            onClick={() => filterByFandom(f)}
+            onClick={() => setActiveFandom(f)}
           >
             {f}
           </button>
@@ -89,7 +104,10 @@ const Home = ({ user }) => {
                 <button onClick={() => toggleFavorite(book.id)} className="favorite-btn">❤️</button>
                 
                 <div className="book-content">
-                  <span className="fandom-tag">{book.fandom || "Без фандому"}</span>
+                  <div style={{ display: 'flex', gap: '5px' }}>
+                    <span className="fandom-tag">{book.fandom || "Без фандому"}</span>
+                    <span className="genre-tag">{book.genre || "Без жанру"}</span>
+                  </div>
                   <h2>{book.title}</h2>
                   <h3>{book.author}</h3>
                   <p>{book.description}</p>
@@ -122,6 +140,7 @@ function App() {
         <Link to="/" className="logo">Page-Turner</Link>
         <div className="nav-links">
           <Link to="/" className="nav-link">Каталог</Link>
+          <Link to="/fandoms" className="nav-link">Фандоми</Link>
           {user ? (
             <>
               <Link to="/add" className="nav-link" style={{color: '#3498db', fontWeight: 'bold'}}>+ Додати</Link>
@@ -138,6 +157,7 @@ function App() {
         <Route path="/edit/:id" element={<EditBook />} />
         <Route path="/login" element={<Auth />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/fandoms" element={<div className="container"><h1>Фандоми та Чати (В розробці)</h1></div>} />
       </Routes>
     </Router>
   );
