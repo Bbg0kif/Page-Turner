@@ -290,3 +290,61 @@ body {
   display: inline-block;
   margin-bottom: 10px;
 }
+
+.fandoms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.fandom-card-link { text-decoration: none; color: inherit; }
+
+.fandom-lobby-card {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  transition: 0.3s;
+}
+
+.fandom-lobby-card:hover { transform: translateY(-5px); border: 1px solid #3498db; }
+
+.chat-box {
+  background: white;
+  height: 400px;
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid #ddd;
+}
+
+.message {
+  background: #f1f1f1;
+  padding: 10px 15px;
+  border-radius: 15px;
+  max-width: 70%;
+  align-self: flex-start;
+}
+
+.message.my-msg {
+  background: #3498db;
+  color: white;
+  align-self: flex-end;
+}
+
+.msg-author { font-size: 0.7rem; font-weight: bold; display: block; margin-bottom: 3px; }
+
+.chat-input-area {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.chat-input-area input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd; }
+
+.chat-input-area button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; }

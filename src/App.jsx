@@ -7,6 +7,8 @@ import AddBook from './pages/AddBook';
 import EditBook from './pages/EditBook';
 import Auth from './pages/Auth';
 import Profile from './pages/Profile';
+import Fandoms from './pages/Fandoms';
+import FandomChat from './pages/FandomChat';
 import './App.css';
 
 const FANDOMS_LIST = ["Всі", "Original", "Harry Potter", "Marvel", "DC", "The Witcher", "Anime", "Інше"];
@@ -26,7 +28,7 @@ const Home = ({ user }) => {
       setBooks(booksData);
       setLoading(false);
     } catch (error) {
-      console.error(error);
+      console.error("Помилка завантаження книг:", error);
       setLoading(false);
     }
   };
@@ -34,7 +36,7 @@ const Home = ({ user }) => {
   useEffect(() => { fetchBooks(); }, []);
 
   const filteredBooks = books.filter(book => {
-    const matchesSearch = book.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = book.title?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFandom = activeFandom === "Всі" || book.fandom === activeFandom;
     const matchesGenre = selectedGenre === "Всі жанри" || book.genre === selectedGenre;
     return matchesSearch && matchesFandom && matchesGenre;
@@ -47,18 +49,20 @@ const Home = ({ user }) => {
       const snapshot = await getDocs(q);
       if (snapshot.empty) {
         await addDoc(collection(db, "favorites"), { userId: user.uid, bookId });
-        alert("Додано у вибране");
+        alert("Книгу додано у вибране");
       } else {
         await deleteDoc(doc(db, "favorites", snapshot.docs[0].id));
-        alert("Видалено");
+        alert("Книгу видалено з вибраного");
       }
     } catch (e) { console.error(e); }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Видалити цю книгу?")) {
-      await deleteDoc(doc(db, "books", id));
-      setBooks(books.filter(b => b.id !== id));
+    if (window.confirm("Ви впевнені, що хочете видалити цю книгу?")) {
+      try {
+        await deleteDoc(doc(db, "books", id));
+        setBooks(books.filter(b => b.id !== id));
+      } catch (e) { alert("Помилка при видаленні"); }
     }
   };
 
@@ -101,7 +105,7 @@ const Home = ({ user }) => {
             const canEdit = user && (book.userId === user.uid || user.email === "b.oleksandra200@gmail.com");
             return (
               <div key={book.id} className="book-card">
-                <button onClick={() => toggleFavorite(book.id)} className="favorite-btn">❤️</button>
+                <button onClick={() => toggleFavorite(book.id)} className="favorite-btn" title="Додати у вибране">❤️</button>
                 
                 <div className="book-content">
                   <div style={{ display: 'flex', gap: '5px' }}>
@@ -115,8 +119,8 @@ const Home = ({ user }) => {
 
                 {canEdit && (
                   <div className="admin-controls">
-                    <Link to={`/edit/${book.id}`} className="control-btn edit">✏️</Link>
-                    <button onClick={() => handleDelete(book.id)} className="control-btn delete">🗑️</button>
+                    <Link title="Редагувати" to={`/edit/${book.id}`} className="control-btn edit">✏️</Link>
+                    <button title="Видалити" onClick={() => handleDelete(book.id)} className="control-btn delete">🗑️</button>
                   </div>
                 )}
               </div>
@@ -131,8 +135,13 @@ const Home = ({ user }) => {
 function App() {
   const [user, setUser] = useState(null);
   useEffect(() => {
-    return onAuthStateChanged(auth, (u) => setUser(u));
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
   }, []);
+  const handleLogout = async () => {
+    await signOut(auth);
+    alert("Ви вийшли з аккаунту");
+  };
 
   return (
     <Router>
@@ -145,9 +154,13 @@ function App() {
             <>
               <Link to="/add" className="nav-link" style={{color: '#3498db', fontWeight: 'bold'}}>+ Додати</Link>
               <Link to="/profile" className="nav-link">Мій кабінет</Link>
-              <button onClick={() => signOut(auth)} className="nav-link logout-btn">Вийти</button>
+              <button onClick={handleLogout} className="nav-link logout-btn" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
+                Вийти ({user.email.split('@')[0]})
+              </button>
             </>
-          ) : <Link to="/login" className="nav-link">Увійти</Link>}
+          ) : (
+            <Link to="/login" className="nav-link">Увійти</Link>
+          )}
         </div>
       </nav>
 
@@ -157,7 +170,8 @@ function App() {
         <Route path="/edit/:id" element={<EditBook />} />
         <Route path="/login" element={<Auth />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/fandoms" element={<div className="container"><h1>Фандоми та Чати (В розробці)</h1></div>} />
+        <Route path="/fandoms" element={<Fandoms />} />
+        <Route path="/fandom/:id" element={<FandomChat />} />
       </Routes>
     </Router>
   );
