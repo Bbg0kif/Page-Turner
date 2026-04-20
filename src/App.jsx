@@ -20,6 +20,7 @@ const Home = ({ user }) => {
   const [activeFandom, setActiveFandom] = useState("Всі");
   const [selectedGenre, setSelectedGenre] = useState("Всі жанри");
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedBooks, setExpandedBooks] = useState({});
 
   const fetchBooks = async () => {
     try {
@@ -34,6 +35,13 @@ const Home = ({ user }) => {
   };
 
   useEffect(() => { fetchBooks(); }, []);
+
+  const toggleReadMore = (id) => {
+    setExpandedBooks(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   const filteredBooks = books.filter(book => {
     const matchesSearch = book.title?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -103,6 +111,10 @@ const Home = ({ user }) => {
         <div className="books-grid">
           {filteredBooks.map(book => {
             const canEdit = user && (book.userId === user.uid || user.email === "b.oleksandra200@gmail.com");
+            const isExpanded = expandedBooks[book.id];
+            const textLimit = 150; // Межа символів
+            const isLongText = book.description && book.description.length > textLimit;
+
             return (
               <div key={book.id} className="book-card">
                 <button onClick={() => toggleFavorite(book.id)} className="favorite-btn" title="Додати у вибране">❤️</button>
@@ -114,7 +126,21 @@ const Home = ({ user }) => {
                   </div>
                   <h2>{book.title}</h2>
                   <h3>{book.author}</h3>
-                  <p>{book.description}</p>
+                  
+                  <p className="book-card-text">
+                    {isLongText && !isExpanded 
+                      ? `${book.description.substring(0, textLimit)}...` 
+                      : book.description}
+                    
+                    {isLongText && (
+                      <button 
+                        className="read-more-btn" 
+                        onClick={() => toggleReadMore(book.id)}
+                      >
+                        {isExpanded ? " Згорнути" : " Читати далі"}
+                      </button>
+                    )}
+                  </p>
                 </div>
 
                 {canEdit && (
@@ -138,6 +164,7 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
   }, []);
+  
   const handleLogout = async () => {
     await signOut(auth);
     alert("Ви вийшли з аккаунту");

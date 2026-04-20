@@ -348,3 +348,28 @@ body {
 .chat-input-area input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd; }
 
 .chat-input-area button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; }
+
+.book-card-text {
+  line-height: 1.6;
+  color: #555;
+  font-size: 0.95rem;
+  margin-bottom: 20px;
+}
+
+.read-more-btn {
+  background: none;
+  border: none;
+  color: #3498db;
+  cursor: pointer;
+  font-weight: bold;
+  padding: 0;
+  font-size: 0.9rem;
+  margin-left: 5px;
+  text-decoration: underline;
+  display: inline;
+}
+
+.read-more-btn:hover {
+  color: #2980b9;
+  text-decoration: none;
+}
