@@ -432,3 +432,31 @@ body {
   border-radius: 4px;
   cursor: pointer;
 }
+
+.rating-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.stars {
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #f1c40f;
+}
+
+.star {
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.star:hover {
+  transform: scale(1.2);
+}
+
+.rating-value {
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #7f8c8d;
+}

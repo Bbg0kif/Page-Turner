@@ -24,6 +24,7 @@ const Home = ({ user }) => {
   const [showComments, setShowComments] = useState({});
   const [comments, setComments] = useState({});
   const [commentInputs, setCommentInputs] = useState({});
+  const [ratings, setRatings] = useState({});
 
   const fetchBooks = async () => {
     try {
@@ -37,9 +38,32 @@ const Home = ({ user }) => {
     }
   };
 
+  const fetchRatings = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "ratings"));
+      const allRatings = {};
+      
+      querySnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (!allRatings[data.bookId]) allRatings[data.bookId] = [];
+        allRatings[data.bookId].push(data.stars);
+      });
+
+      const averages = {};
+      for (const bookId in allRatings) {
+        const sum = allRatings[bookId].reduce((a, b) => a + b, 0);
+        averages[bookId] = (sum / allRatings[bookId].length).toFixed(1);
+      }
+      setRatings(averages);
+    } catch (e) {
+      console.error("Помилка завантаження рейтингів:", e);
+    }
+  };
+
   useEffect(() => { 
     fetchBooks(); 
-
+    fetchRatings();
+    
     const q = query(collection(db, "comments"), orderBy("createdAt", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const allComments = {};
@@ -54,6 +78,21 @@ const Home = ({ user }) => {
     return () => unsubscribe();
   }, []);
 
+  const handleRate = async (bookId, stars) => {
+    if (!user) { alert("Увійдіть, щоб оцінити!"); return; }
+    try {
+      await addDoc(collection(db, "ratings"), {
+        bookId,
+        userId: user.uid,
+        stars,
+        createdAt: new Date()
+      });
+      fetchRatings();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const toggleReadMore = (id) => {
     setExpandedBooks(prev => ({ ...prev, [id]: !prev[id] }));
   };
@@ -65,7 +104,6 @@ const Home = ({ user }) => {
   const handleAddComment = async (bookId) => {
     const text = commentInputs[bookId];
     if (!user || !text?.trim()) return;
-
     try {
       await addDoc(collection(db, "comments"), {
         bookId,
@@ -75,9 +113,7 @@ const Home = ({ user }) => {
         createdAt: new Date()
       });
       setCommentInputs(prev => ({ ...prev, [bookId]: "" }));
-    } catch (e) {
-      console.error("Error adding comment:", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const filteredBooks = books.filter(book => {
@@ -88,7 +124,7 @@ const Home = ({ user }) => {
   });
 
   const toggleFavorite = async (bookId) => {
-    if (!user) { alert("Увійдіть у систему!"); return; }
+    if (!user) { alert("Увійдіть!"); return; }
     try {
       const q = query(collection(db, "favorites"), where("userId", "==", user.uid), where("bookId", "==", bookId));
       const snapshot = await getDocs(q);
@@ -98,15 +134,6 @@ const Home = ({ user }) => {
         await deleteDoc(doc(db, "favorites", snapshot.docs[0].id));
       }
     } catch (e) { console.error(e); }
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("Ви впевнені?")) {
-      try {
-        await deleteDoc(doc(db, "books", id));
-        setBooks(books.filter(b => b.id !== id));
-      } catch (e) { alert("Помилка"); }
-    }
   };
 
   return (
@@ -138,6 +165,7 @@ const Home = ({ user }) => {
           const isExpanded = expandedBooks[book.id];
           const isCommentsOpen = showComments[book.id];
           const bookComments = comments[book.id] || [];
+          const avgRating = ratings[book.id] || "0.0";
 
           return (
             <div key={book.id} className="book-card">
@@ -148,8 +176,20 @@ const Home = ({ user }) => {
                   <span className="fandom-tag">{book.fandom}</span>
                   <span className="genre-tag">{book.genre}</span>
                 </div>
+                
                 <h2>{book.title}</h2>
                 <h3>{book.author}</h3>
+
+                <div className="rating-area">
+                  <div className="stars">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <span key={star} className="star" onClick={() => handleRate(book.id, star)}>
+                        {star <= Math.round(avgRating) ? "★" : "☆"}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="rating-value">{avgRating}</span>
+                </div>
                 
                 <p className="book-card-text">
                   {book.description?.length > 150 && !isExpanded 
@@ -193,7 +233,7 @@ const Home = ({ user }) => {
               {canEdit && (
                 <div className="admin-controls">
                   <Link to={`/edit/${book.id}`} className="control-btn">✏️</Link>
-                  <button onClick={() => handleDelete(book.id)} className="control-btn">🗑️</button>
+                  <button onClick={() => deleteDoc(doc(db, "books", book.id))} className="control-btn delete">🗑️</button>
                 </div>
               )}
             </div>
@@ -227,7 +267,7 @@ function App() {
             <>
               <Link to="/add" className="nav-link" style={{color: '#3498db', fontWeight: 'bold'}}>+ Додати</Link>
               <Link to="/profile" className="nav-link">Мій кабінет</Link>
-              <button onClick={handleLogout} className="nav-link logout-btn" style={{background: 'none', border: 'none', cursor: 'pointer'}}>
+              <button onClick={handleLogout} className="nav-link logout-btn">
                 Вийти ({user.email.split('@')[0]})
               </button>
             </>
