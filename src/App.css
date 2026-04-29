@@ -460,3 +460,53 @@ body {
   font-weight: bold;
   color: #7f8c8d;
 }
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+  margin-bottom: 30px;
+}
+
+.profile-avatar {
+  width: 100px;
+  height: 100px;
+  background: var(--accent-color);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  font-weight: bold;
+}
+
+.profile-info h1 {
+  margin: 0;
+  color: var(--primary-color);
+}
+
+.profile-stats {
+  display: flex;
+  gap: 20px;
+  margin-top: 10px;
+  color: var(--text-muted);
+}
+
+.profile-divider {
+  border: 0;
+  height: 1px;
+  background: #ddd;
+  margin: 40px 0;
+}
+
+.profile-section h2 {
+  margin-bottom: 20px;
+  color: var(--primary-color);
+  border-left: 4px solid var(--accent-color);
+  padding-left: 15px;
+}
