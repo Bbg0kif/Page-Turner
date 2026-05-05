@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { db, auth } from './firebase';
 import { collection, getDocs, deleteDoc, doc, addDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore'; 
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { withLogging } from './utils';
 import AddBook from './pages/AddBook';
 import EditBook from './pages/EditBook';
 import Auth from './pages/Auth';
@@ -24,7 +25,26 @@ const Home = ({ user }) => {
   const [showComments, setShowComments] = useState({});
   const [comments, setComments] = useState({});
   const [commentInputs, setCommentInputs] = useState({});
-  const [ratings, setRatings] = useState({});
+  const [ratings, setRatings] = useState({}); 
+
+  const handleAddCommentLogged = withLogging(async (bookId, text) => {
+    await addDoc(collection(db, "comments"), {
+      bookId,
+      text: text.trim(),
+      userId: user.uid,
+      userName: user.email.split('@')[0],
+      createdAt: new Date()
+    });
+  }, "INFO");
+
+  const handleRateLogged = withLogging(async (bookId, stars) => {
+    await addDoc(collection(db, "ratings"), {
+      bookId,
+      userId: user.uid,
+      stars,
+      createdAt: new Date()
+    });
+  }, "INFO");
 
   const fetchBooks = async () => {
     try {
@@ -42,7 +62,6 @@ const Home = ({ user }) => {
     try {
       const querySnapshot = await getDocs(collection(db, "ratings"));
       const allRatings = {};
-      
       querySnapshot.docs.forEach(doc => {
         const data = doc.data();
         if (!allRatings[data.bookId]) allRatings[data.bookId] = [];
@@ -56,7 +75,7 @@ const Home = ({ user }) => {
       }
       setRatings(averages);
     } catch (e) {
-      console.error("Помилка завантаження рейтингів:", e);
+      console.error("Помилка рейтингів:", e);
     }
   };
 
@@ -79,42 +98,21 @@ const Home = ({ user }) => {
   }, []);
 
   const handleRate = async (bookId, stars) => {
-    if (!user) { alert("Увійдіть, щоб оцінити!"); return; }
-    try {
-      await addDoc(collection(db, "ratings"), {
-        bookId,
-        userId: user.uid,
-        stars,
-        createdAt: new Date()
-      });
-      fetchRatings();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const toggleReadMore = (id) => {
-    setExpandedBooks(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const toggleComments = (id) => {
-    setShowComments(prev => ({ ...prev, [id]: !prev[id] }));
+    if (!user) { alert("Увійдіть!"); return; }
+    await handleRateLogged(bookId, stars);
+    fetchRatings();
   };
 
   const handleAddComment = async (bookId) => {
     const text = commentInputs[bookId];
     if (!user || !text?.trim()) return;
-    try {
-      await addDoc(collection(db, "comments"), {
-        bookId,
-        text: text.trim(),
-        userId: user.uid,
-        userName: user.email.split('@')[0],
-        createdAt: new Date()
-      });
-      setCommentInputs(prev => ({ ...prev, [bookId]: "" }));
-    } catch (e) { console.error(e); }
+    
+    await handleAddCommentLogged(bookId, text);
+    setCommentInputs(prev => ({ ...prev, [bookId]: "" }));
   };
+
+  const toggleReadMore = (id) => setExpandedBooks(prev => ({ ...prev, [id]: !prev[id] }));
+  const toggleComments = (id) => setShowComments(prev => ({ ...prev, [id]: !prev[id] }));
 
   const filteredBooks = books.filter(book => {
     const matchesSearch = book.title?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -122,19 +120,6 @@ const Home = ({ user }) => {
     const matchesGenre = selectedGenre === "Всі жанри" || book.genre === selectedGenre;
     return matchesSearch && matchesFandom && matchesGenre;
   });
-
-  const toggleFavorite = async (bookId) => {
-    if (!user) { alert("Увійдіть!"); return; }
-    try {
-      const q = query(collection(db, "favorites"), where("userId", "==", user.uid), where("bookId", "==", bookId));
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) {
-        await addDoc(collection(db, "favorites"), { userId: user.uid, bookId });
-      } else {
-        await deleteDoc(doc(db, "favorites", snapshot.docs[0].id));
-      }
-    } catch (e) { console.error(e); }
-  };
 
   return (
     <div className="container">
@@ -161,7 +146,6 @@ const Home = ({ user }) => {
 
       <div className="books-grid">
         {filteredBooks.map(book => {
-          const canEdit = user && (book.userId === user.uid || user.email === "b.oleksandra200@gmail.com");
           const isExpanded = expandedBooks[book.id];
           const isCommentsOpen = showComments[book.id];
           const bookComments = comments[book.id] || [];
@@ -169,8 +153,6 @@ const Home = ({ user }) => {
 
           return (
             <div key={book.id} className="book-card">
-              <button onClick={() => toggleFavorite(book.id)} className="favorite-btn">❤️</button>
-              
               <div className="book-content">
                 <div style={{ display: 'flex', gap: '5px' }}>
                   <span className="fandom-tag">{book.fandom}</span>
@@ -178,8 +160,7 @@ const Home = ({ user }) => {
                 </div>
                 
                 <h2>{book.title}</h2>
-                <h3>{book.author}</h3>
-
+                
                 <div className="rating-area">
                   <div className="stars">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -229,13 +210,6 @@ const Home = ({ user }) => {
                   </div>
                 )}
               </div>
-
-              {canEdit && (
-                <div className="admin-controls">
-                  <Link to={`/edit/${book.id}`} className="control-btn">✏️</Link>
-                  <button onClick={() => deleteDoc(doc(db, "books", book.id))} className="control-btn delete">🗑️</button>
-                </div>
-              )}
             </div>
           );
         })}
@@ -250,11 +224,6 @@ function App() {
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsubscribe();
   }, []);
-  
-  const handleLogout = async () => {
-    await signOut(auth);
-    alert("Ви вийшли з аккаунту");
-  };
 
   return (
     <Router>
@@ -265,11 +234,9 @@ function App() {
           <Link to="/fandoms" className="nav-link">Фандоми</Link>
           {user ? (
             <>
-              <Link to="/add" className="nav-link" style={{color: '#3498db', fontWeight: 'bold'}}>+ Додати</Link>
+              <Link to="/add" className="nav-link">+ Додати</Link>
               <Link to="/profile" className="nav-link">Мій кабінет</Link>
-              <button onClick={handleLogout} className="nav-link logout-btn">
-                Вийти ({user.email.split('@')[0]})
-              </button>
+              <button onClick={() => signOut(auth)} className="nav-link logout-btn">Вийти</button>
             </>
           ) : (
             <Link to="/login" className="nav-link">Увійти</Link>
