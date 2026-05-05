@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { db, auth } from './firebase';
-import { collection, getDocs, deleteDoc, doc, addDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore'; 
+import { collection, getDocs, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore'; 
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { withLogging } from './utils';
+import { withLogging, memoize } from './utils';
 import AddBook from './pages/AddBook';
 import EditBook from './pages/EditBook';
 import Auth from './pages/Auth';
@@ -14,6 +14,13 @@ import './App.css';
 
 const FANDOMS_LIST = ["Всі", "Original", "Harry Potter", "Marvel", "DC", "The Witcher", "Anime", "Інше"];
 const GENRES_LIST = ["Всі жанри", "Роман", "Фентезі", "Детектив", "Трилер", "Пригоди", "Драма", "Жахи", "Інше"];
+
+const calculateAverage = (scores) => {
+  if (!scores || scores.length === 0) return "0.0";
+  const sum = scores.reduce((a, b) => a + b, 0);
+  return (sum / scores.length).toFixed(1);
+};
+const memoizedAvg = memoize(calculateAverage, { maxSize: 20 });
 
 const Home = ({ user }) => {
   const [books, setBooks] = useState([]);
@@ -39,50 +46,37 @@ const Home = ({ user }) => {
 
   const handleRateLogged = withLogging(async (bookId, stars) => {
     await addDoc(collection(db, "ratings"), {
-      bookId,
-      userId: user.uid,
-      stars,
-      createdAt: new Date()
+      bookId, userId: user.uid, stars, createdAt: new Date()
     });
   }, "INFO");
 
   const fetchBooks = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "books"));
-      const booksData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setBooks(booksData);
-      setLoading(false);
-    } catch (error) {
-      console.error("Помилка завантаження книг:", error);
-      setLoading(false);
-    }
+    const querySnapshot = await getDocs(collection(db, "books"));
+    setBooks(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setLoading(false);
   };
 
   const fetchRatings = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "ratings"));
-      const allRatings = {};
-      querySnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        if (!allRatings[data.bookId]) allRatings[data.bookId] = [];
-        allRatings[data.bookId].push(data.stars);
-      });
+    const querySnapshot = await getDocs(collection(db, "ratings"));
+    const allRatings = {};
+    querySnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (!allRatings[data.bookId]) allRatings[data.bookId] = [];
+      allRatings[data.bookId].push(data.stars);
+    });
 
-      const averages = {};
-      for (const bookId in allRatings) {
-        const sum = allRatings[bookId].reduce((a, b) => a + b, 0);
-        averages[bookId] = (sum / allRatings[bookId].length).toFixed(1);
-      }
-      setRatings(averages);
-    } catch (e) {
-      console.error("Помилка рейтингів:", e);
+    const averages = {};
+    for (const bookId in allRatings) {
+
+      averages[bookId] = memoizedAvg(allRatings[bookId]);
     }
+    setRatings(averages);
   };
 
   useEffect(() => { 
     fetchBooks(); 
     fetchRatings();
-    
+
     const q = query(collection(db, "comments"), orderBy("createdAt", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const allComments = {};
@@ -93,12 +87,11 @@ const Home = ({ user }) => {
       });
       setComments(allComments);
     });
-
     return () => unsubscribe();
   }, []);
 
   const handleRate = async (bookId, stars) => {
-    if (!user) { alert("Увійдіть!"); return; }
+    if (!user) return alert("Увійдіть!");
     await handleRateLogged(bookId, stars);
     fetchRatings();
   };
@@ -106,13 +99,9 @@ const Home = ({ user }) => {
   const handleAddComment = async (bookId) => {
     const text = commentInputs[bookId];
     if (!user || !text?.trim()) return;
-    
     await handleAddCommentLogged(bookId, text);
     setCommentInputs(prev => ({ ...prev, [bookId]: "" }));
   };
-
-  const toggleReadMore = (id) => setExpandedBooks(prev => ({ ...prev, [id]: !prev[id] }));
-  const toggleComments = (id) => setShowComments(prev => ({ ...prev, [id]: !prev[id] }));
 
   const filteredBooks = books.filter(book => {
     const matchesSearch = book.title?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -124,15 +113,8 @@ const Home = ({ user }) => {
   return (
     <div className="container">
       <h1>Каталог книг</h1>
-
       <div className="search-bar">
-        <input 
-          type="text" 
-          placeholder="Пошук..." 
-          className="search-input"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <input type="text" placeholder="Пошук..." className="search-input" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         <select className="genre-select" value={selectedGenre} onChange={(e) => setSelectedGenre(e.target.value)}>
           {GENRES_LIST.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
@@ -145,74 +127,49 @@ const Home = ({ user }) => {
       </div>
 
       <div className="books-grid">
-        {filteredBooks.map(book => {
-          const isExpanded = expandedBooks[book.id];
-          const isCommentsOpen = showComments[book.id];
-          const bookComments = comments[book.id] || [];
-          const avgRating = ratings[book.id] || "0.0";
-
-          return (
-            <div key={book.id} className="book-card">
-              <div className="book-content">
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  <span className="fandom-tag">{book.fandom}</span>
-                  <span className="genre-tag">{book.genre}</span>
-                </div>
-                
-                <h2>{book.title}</h2>
-                
-                <div className="rating-area">
-                  <div className="stars">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <span key={star} className="star" onClick={() => handleRate(book.id, star)}>
-                        {star <= Math.round(avgRating) ? "★" : "☆"}
-                      </span>
-                    ))}
-                  </div>
-                  <span className="rating-value">{avgRating}</span>
-                </div>
-                
-                <p className="book-card-text">
-                  {book.description?.length > 150 && !isExpanded 
-                    ? `${book.description.substring(0, 150)}...` 
-                    : book.description}
-                  {book.description?.length > 150 && (
-                    <button className="read-more-btn" onClick={() => toggleReadMore(book.id)}>
-                      {isExpanded ? " Згорнути" : " Читати далі"}
-                    </button>
-                  )}
-                </p>
-
-                <button className="toggle-comments-btn" onClick={() => toggleComments(book.id)}>
-                  Коментарі ({bookComments.length})
-                </button>
-
-                {isCommentsOpen && (
-                  <div className="comments-box">
-                    <div className="comments-list">
-                      {bookComments.map(c => (
-                        <div key={c.id} className="comment-item">
-                          <strong>{c.userName}:</strong> {c.text}
-                        </div>
-                      ))}
-                    </div>
-                    {user && (
-                      <div className="comment-input-area">
-                        <input 
-                          type="text" 
-                          placeholder="Ваш коментар..." 
-                          value={commentInputs[book.id] || ""}
-                          onChange={(e) => setCommentInputs(prev => ({ ...prev, [book.id]: e.target.value }))}
-                        />
-                        <button onClick={() => handleAddComment(book.id)}>OK</button>
-                      </div>
-                    )}
-                  </div>
-                )}
+        {filteredBooks.map(book => (
+          <div key={book.id} className="book-card">
+            <div className="book-content">
+              <div style={{ display: 'flex', gap: '5px' }}>
+                <span className="fandom-tag">{book.fandom}</span>
+                <span className="genre-tag">{book.genre}</span>
               </div>
+              <h2>{book.title}</h2>
+              <div className="rating-area">
+                <div className="stars">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <span key={s} className="star" onClick={() => handleRate(book.id, s)}>
+                      {s <= Math.round(ratings[book.id] || 0) ? "★" : "☆"}
+                    </span>
+                  ))}
+                </div>
+                <span className="rating-value">{ratings[book.id] || "0.0"}</span>
+              </div>
+              <p className="book-card-text">
+                {expandedBooks[book.id] ? book.description : `${book.description?.substring(0, 150)}...`}
+                <button className="read-more-btn" onClick={() => setExpandedBooks(p => ({...p, [book.id]: !p[book.id]}))}>
+                  {expandedBooks[book.id] ? " Згорнути" : " Читати далі"}
+                </button>
+              </p>
+              <button className="toggle-comments-btn" onClick={() => setShowComments(p => ({...p, [book.id]: !p[book.id]}))}>
+                Коментарі ({comments[book.id]?.length || 0})
+              </button>
+              {showComments[book.id] && (
+                <div className="comments-box">
+                  <div className="comments-list">
+                    {(comments[book.id] || []).map(c => <div key={c.id} className="comment-item"><strong>{c.userName}:</strong> {c.text}</div>)}
+                  </div>
+                  {user && (
+                    <div className="comment-input-area">
+                      <input value={commentInputs[book.id] || ""} onChange={(e) => setCommentInputs(p => ({...p, [book.id]: e.target.value}))} placeholder="Ваш коментар..." />
+                      <button onClick={() => handleAddComment(book.id)}>OK</button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -235,15 +192,12 @@ function App() {
           {user ? (
             <>
               <Link to="/add" className="nav-link">+ Додати</Link>
-              <Link to="/profile" className="nav-link">Мій кабінет</Link>
+              <Link to="/profile" className="nav-link">Профіль</Link>
               <button onClick={() => signOut(auth)} className="nav-link logout-btn">Вийти</button>
             </>
-          ) : (
-            <Link to="/login" className="nav-link">Увійти</Link>
-          )}
+          ) : <Link to="/login" className="nav-link">Увійти</Link>}
         </div>
       </nav>
-
       <Routes>
         <Route path="/" element={<Home user={user} />} />
         <Route path="/add" element={<AddBook />} />
