@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { db, auth } from './firebase';
 import { collection, getDocs, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore'; 
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { withLogging, memoize, colorGenerator } from './utils';
+import { withLogging, memoize, colorGenerator, PriorityQueue } from './utils';
 import AddBook from './pages/AddBook';
 import EditBook from './pages/EditBook';
 import Auth from './pages/Auth';
@@ -28,6 +28,8 @@ const calculateAverage = (scores) => {
 };
 const memoizedAvg = memoize(calculateAverage, { maxSize: 30 });
 
+const notificationQueue = new PriorityQueue();
+
 const Home = ({ user }) => {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,26 @@ const Home = ({ user }) => {
   const [comments, setComments] = useState({});
   const [commentInputs, setCommentInputs] = useState({});
   const [ratings, setRatings] = useState({}); 
+  const [activeNotification, setActiveNotification] = useState(null);
+
+  const processQueue = () => {
+    if (notificationQueue.isEmpty()) return;
+    
+    const next = notificationQueue.dequeue();
+    setActiveNotification(next.element);
+
+    setTimeout(() => {
+      setActiveNotification(null);
+      setTimeout(processQueue, 500);
+    }, 3000);
+  };
+
+  const notify = (text, priority) => {
+    notificationQueue.enqueue(text, priority);
+    if (!activeNotification) {
+      processQueue();
+    }
+  };
 
   const handleAddCommentLogged = withLogging(async (bookId, text) => {
     await addDoc(collection(db, "comments"), {
@@ -53,20 +75,10 @@ const Home = ({ user }) => {
     });
   }, "INFO");
 
-  const fetchBooksAndMeta = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, "books"));
-      const rawBooks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      const processedBooks = await Promise.all(rawBooks.map(async (book) => {
-        return { ...book, loadedAt: Date.now() }; 
-      }));
-
-      setBooks(processedBooks);
-      setLoading(false);
-    } catch (error) {
-      console.error("Error:", error);
-    }
+  const fetchBooks = async () => {
+    const querySnapshot = await getDocs(collection(db, "books"));
+    setBooks(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setLoading(false);
   };
 
   const fetchRatings = async () => {
@@ -86,7 +98,7 @@ const Home = ({ user }) => {
   };
 
   useEffect(() => { 
-    fetchBooksAndMeta(); 
+    fetchBooks(); 
     fetchRatings();
     
     const q = query(collection(db, "comments"), orderBy("createdAt", "asc"));
@@ -103,15 +115,25 @@ const Home = ({ user }) => {
   }, []);
 
   const handleRate = async (bookId, stars) => {
-    if (!user) return alert("Увійдіть!");
+    if (!user) {
+      notify("Помилка: Увійдіть, щоб поставити оцінку!", 3);
+      return;
+    }
     await handleRateLogged(bookId, stars);
+    notify("Рейтинг оновлено!", 1);
     fetchRatings();
   };
 
   const handleAddComment = async (bookId) => {
     const text = commentInputs[bookId];
-    if (!user || !text?.trim()) return;
+    if (!user) {
+        notify("Помилка: Авторизуйтесь для коментування!", 3);
+        return;
+    }
+    if (!text?.trim()) return;
+
     await handleAddCommentLogged(bookId, text);
+    notify("Коментар додано успішно!", 2);
     setCommentInputs(p => ({ ...p, [bookId]: "" }));
   };
 
@@ -124,6 +146,11 @@ const Home = ({ user }) => {
 
   return (
     <div className="container">
+      {activeNotification && (
+        <div className="toast-notification">
+          {activeNotification}
+        </div>
+      )}
       <h1>Каталог книг</h1>
       <div className="search-bar">
         <input type="text" placeholder="Пошук..." className="search-input" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
@@ -134,13 +161,7 @@ const Home = ({ user }) => {
 
       <div className="filter-bar">
         {FANDOMS_LIST.map(f => (
-          <button 
-            key={f} 
-            className={`filter-btn ${activeFandom === f ? 'active' : ''}`} 
-            onClick={() => setActiveFandom(f)}
-          >
-            {f}
-          </button>
+          <button key={f} className={`filter-btn ${activeFandom === f ? 'active' : ''}`} onClick={() => setActiveFandom(f)}>{f}</button>
         ))}
       </div>
 
@@ -151,10 +172,7 @@ const Home = ({ user }) => {
             <div key={book.id} className="book-card">
               <div className="book-content">
                 <div style={{ display: 'flex', gap: '5px' }}>
-                  <span 
-                    className="fandom-tag" 
-                    style={{ backgroundColor: FANDOM_COLORS[book.fandom] || '#2c3e50' }}
-                  >
+                  <span className="fandom-tag" style={{ backgroundColor: FANDOM_COLORS[book.fandom] || '#2c3e50' }}>
                     {book.fandom}
                   </span>
                   <span className="genre-tag">{book.genre}</span>
