@@ -97,3 +97,20 @@ export class PriorityQueue {
     return this.items.length === 0;
   }
 }
+
+export const createBookStream = (dataArray, chunkSize = 4) => {
+  let index = 0;
+
+  return new ReadableStream({
+    async pull(controller) {
+      if (index >= dataArray.length) {
+        controller.close();
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const chunk = dataArray.slice(index, index + chunkSize);
+      index += chunkSize;
+      controller.enqueue(chunk);
+    }
+  });
+};

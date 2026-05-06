@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import { db, auth } from './firebase';
 import { collection, getDocs, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore'; 
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { withLogging, memoize, colorGenerator, PriorityQueue } from './utils';
+import { withLogging, memoize, colorGenerator, PriorityQueue, createBookStream } from './utils';
 import AddBook from './pages/AddBook';
 import EditBook from './pages/EditBook';
 import Auth from './pages/Auth';
@@ -32,6 +32,9 @@ const notificationQueue = new PriorityQueue();
 
 const Home = ({ user }) => {
   const [books, setBooks] = useState([]);
+  const [visibleBooks, setVisibleBooks] = useState([]); 
+  const [streamReader, setStreamReader] = useState(null);
+  
   const [loading, setLoading] = useState(true);
   const [activeFandom, setActiveFandom] = useState("Всі");
   const [selectedGenre, setSelectedGenre] = useState("Всі жанри");
@@ -45,10 +48,8 @@ const Home = ({ user }) => {
 
   const processQueue = () => {
     if (notificationQueue.isEmpty()) return;
-    
     const next = notificationQueue.dequeue();
     setActiveNotification(next.element);
-
     setTimeout(() => {
       setActiveNotification(null);
       setTimeout(processQueue, 500);
@@ -57,8 +58,20 @@ const Home = ({ user }) => {
 
   const notify = (text, priority) => {
     notificationQueue.enqueue(text, priority);
-    if (!activeNotification) {
-      processQueue();
+    if (!activeNotification) processQueue();
+  };
+
+  const loadNextChunk = async (reader = streamReader) => {
+    if (!reader) return;
+    const { value, done } = await reader.read();
+    if (done) {
+      notify("Всі книги завантажені", 1);
+      setStreamReader(null);
+      return;
+    }
+    if (value) {
+      setVisibleBooks(prev => [...prev, ...value]);
+      notify(`Отримано чанк даних: +${value.length} шт.`, 1);
     }
   };
 
@@ -77,7 +90,16 @@ const Home = ({ user }) => {
 
   const fetchBooks = async () => {
     const querySnapshot = await getDocs(collection(db, "books"));
-    setBooks(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setBooks(data);
+
+    const stream = createBookStream(data, 4);
+    const reader = stream.getReader();
+    setStreamReader(reader);
+    
+    const { value } = await reader.read();
+    setVisibleBooks(value || []);
+    
     setLoading(false);
   };
 
@@ -89,7 +111,6 @@ const Home = ({ user }) => {
       if (!allRatings[data.bookId]) allRatings[data.bookId] = [];
       allRatings[data.bookId].push(data.stars);
     });
-
     const averages = {};
     for (const bookId in allRatings) {
       averages[bookId] = memoizedAvg(allRatings[bookId]);
@@ -100,7 +121,6 @@ const Home = ({ user }) => {
   useEffect(() => { 
     fetchBooks(); 
     fetchRatings();
-    
     const q = query(collection(db, "comments"), orderBy("createdAt", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const allComments = {};
@@ -115,10 +135,7 @@ const Home = ({ user }) => {
   }, []);
 
   const handleRate = async (bookId, stars) => {
-    if (!user) {
-      notify("Помилка: Увійдіть, щоб поставити оцінку!", 3);
-      return;
-    }
+    if (!user) return notify("Увійдіть для оцінювання!", 3);
     await handleRateLogged(bookId, stars);
     notify("Рейтинг оновлено!", 1);
     fetchRatings();
@@ -126,18 +143,14 @@ const Home = ({ user }) => {
 
   const handleAddComment = async (bookId) => {
     const text = commentInputs[bookId];
-    if (!user) {
-        notify("Помилка: Авторизуйтесь для коментування!", 3);
-        return;
-    }
+    if (!user) return notify("Авторизуйтесь!", 3);
     if (!text?.trim()) return;
-
     await handleAddCommentLogged(bookId, text);
-    notify("Коментар додано успішно!", 2);
+    notify("Коментар додано", 2);
     setCommentInputs(p => ({ ...p, [bookId]: "" }));
   };
 
-  const filteredBooks = books.filter(book => {
+  const filteredBooks = visibleBooks.filter(book => {
     const matchesSearch = book.title?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFandom = activeFandom === "Всі" || book.fandom === activeFandom;
     const matchesGenre = selectedGenre === "Всі жанри" || book.genre === selectedGenre;
@@ -146,11 +159,8 @@ const Home = ({ user }) => {
 
   return (
     <div className="container">
-      {activeNotification && (
-        <div className="toast-notification">
-          {activeNotification}
-        </div>
-      )}
+      {activeNotification && <div className="toast-notification">{activeNotification}</div>}
+
       <h1>Каталог книг</h1>
       <div className="search-bar">
         <input type="text" placeholder="Пошук..." className="search-input" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
@@ -172,9 +182,7 @@ const Home = ({ user }) => {
             <div key={book.id} className="book-card">
               <div className="book-content">
                 <div style={{ display: 'flex', gap: '5px' }}>
-                  <span className="fandom-tag" style={{ backgroundColor: FANDOM_COLORS[book.fandom] || '#2c3e50' }}>
-                    {book.fandom}
-                  </span>
+                  <span className="fandom-tag" style={{ backgroundColor: FANDOM_COLORS[book.fandom] || '#2c3e50' }}>{book.fandom}</span>
                   <span className="genre-tag">{book.genre}</span>
                 </div>
                 <h2>{book.title}</h2>
@@ -215,6 +223,16 @@ const Home = ({ user }) => {
           );
         })}
       </div>
+
+      {streamReader && (
+        <button 
+          className="read-more-btn" 
+          style={{ display: 'block', margin: '40px auto', padding: '15px 40px' }}
+          onClick={() => loadNextChunk()}
+        >
+          Завантажити ще...
+        </button>
+      )}
     </div>
   );
 };
