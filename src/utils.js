@@ -42,3 +42,28 @@ export const memoize = (fn, config = { maxSize: 50 }) => {
     return result;
   };
 };
+
+export function* colorGenerator() {
+  const colors = [
+    '#3498db', '#e74c3c', '#2ecc71', '#f1c40f', 
+    '#9b59b6', '#e67e22', '#1abc9c', '#34495e'
+  ];
+  let index = 0;
+  while (true) {
+    yield colors[index];
+    index = (index + 1) % colors.length;
+  }
+}
+
+export const createFandomIterator = (fandoms) => {
+  let index = 0;
+  return {
+    next: () => {
+      if (index < fandoms.length) {
+        return { value: fandoms[index++], done: false };
+      } else {
+        return { done: true };
+      }
+    }
+  };
+};
