@@ -1,16 +1,19 @@
-# React + Vite
+Лабораторна №2: Робота з об'єктами та прототипами
+Ця лаба лягла в основу структури даних проєкту.
+Реалізація: Всі сутності (Книги, Користувачі, Коментарі) спроектовані як складні об'єкти. Використовується динамічне створення ключів та копіювання об'єктів для оновлення стану (React state) без мутацій.
+Призначення: Забезпечує цілісність даних при передачі між компонентами.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Лабораторна №5: Асинхронні операції та методи масивів
+Проєкт повністю побудований на асинхронній взаємодії з Firebase.
+Реалізація: Використання методів map, filter та reduce у поєднанні з Promise.all для обробки списків книг та розрахунку рейтингів.
+Код: Функція fetchBooks асинхронно отримує дані, після чого масиви обробляються методами вищого порядку для трансформації даних з БД у формат для рендерингу.
 
-Currently, two official plugins are available:
+Лабораторна №7: Патерн Observer (Спостерігач)
+Реалізовано через механізм підписок у реальному часі.
+Реалізація: Використання методу onSnapshot (Firebase Firestore). Програма "підписується" на зміни в колекції коментарів.
+Результат: Як тільки будь-який користувач додає коментар, всі інші бачать його миттєво без перезавантаження сторінки. Це класична реалізація патерна Observer.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Лабораторна №8: Об'єкти доступу та Proxy
+Використовується для контролю доступу до функціоналу додатка.
+Реалізація: Об'єкт auth та стан user виступають посередниками (проксі) для перевірки прав доступу.
+Застосування: Функції handleAddComment та handleRate перевіряють стан авторизації перед виконанням запиту до бази. Це захищає систему від несанкціонованих дій неавторизованих користувачів.

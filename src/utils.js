@@ -46,7 +46,7 @@ export const memoize = (fn, config = { maxSize: 50 }) => {
 export function* colorGenerator() {
   const colors = [
     '#3498db', '#e74c3c', '#2ecc71', '#f1c40f', 
-    '#9b59b6', '#e67e22', '#1abc9c', '#34495e'
+    '#9b59b6', '#e67e22', '#1abc9c', '#34d8db'
   ];
   let index = 0;
   while (true) {
